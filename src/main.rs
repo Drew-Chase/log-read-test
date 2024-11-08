@@ -62,6 +62,12 @@ pub fn read_console<F>(log_file: impl AsRef<Path>, callback: F) -> Result<(), Bo
 				Ok(_) => {
 					// Re-open the file and seek to the last read position
 					let mut file = File::open(&log_file)?;
+
+					// Reset if file was truncated
+					let size = file.metadata()?.len();
+					if last_read > size { last_read = 0; }
+
+					// Seek to the last read position
 					file.seek(SeekFrom::Start(last_read))?;
 
 					// Read new contents from the file
@@ -71,7 +77,7 @@ pub fn read_console<F>(log_file: impl AsRef<Path>, callback: F) -> Result<(), Bo
 					// If new contents are present, call the callback and update last_read
 					if !new_contents.is_empty() {
 						callback(&new_contents);
-						last_read += new_contents.len() as u64;
+						last_read = file.metadata()?.len(); // Update last_read
 					}
 				}
 				Err(e) => {
