@@ -6,14 +6,17 @@ use std::io::{Read, Seek, SeekFrom};
 use std::path::Path;
 
 fn main() {
+	// Set the logging level to debug
 	std::env::set_var("RUST_LOG", "debug");
+	// Initialize the logger
 	env_logger::init();
+	// Call read_console to process the log file and handle the results
 	match read_console(
 		"test.txt",
-		|contents|
-			{
-				println!("{}", contents);
-			}
+		// Define a callback to print the contents
+		|contents| {
+			println!("{}", contents);
+		}
 	)
 	{
 		Ok(_) => {
@@ -25,7 +28,15 @@ fn main() {
 	}
 }
 
-
+/// Reads from the given log file and calls the provided callback with its contents.
+/// Continues to watch the file for changes and updates the callback with new contents.
+///
+/// # Arguments
+/// * `log_file` - Path to the log file to read from.
+/// * `callback` - A closure that takes a string slice and processes the log contents.
+///
+/// # Returns
+/// * `Result<(), Box<dyn Error>>` - Ok() on success, otherwise an error.
 pub fn read_console<F>(log_file: impl AsRef<Path>, callback: F) -> Result<(), Box<dyn Error>>
                        where
 	                       F: Fn(&str) + Send + 'static,
@@ -36,6 +47,7 @@ pub fn read_console<F>(log_file: impl AsRef<Path>, callback: F) -> Result<(), Bo
 	file.read_to_string(&mut contents)?;
 	callback(&contents);
 
+	// Track the byte position of the file to read new contents from
 	let mut last_read = file.metadata()?.len();
 
 	// Watch the log file for changes
@@ -48,12 +60,15 @@ pub fn read_console<F>(log_file: impl AsRef<Path>, callback: F) -> Result<(), Bo
 		match rx.recv() {
 			Ok(event) => match event {
 				Ok(_) => {
+					// Re-open the file and seek to the last read position
 					let mut file = File::open(&log_file)?;
 					file.seek(SeekFrom::Start(last_read))?;
 
+					// Read new contents from the file
 					let mut new_contents = String::new();
 					file.read_to_string(&mut new_contents)?;
 
+					// If new contents are present, call the callback and update last_read
 					if !new_contents.is_empty() {
 						callback(&new_contents);
 						last_read += new_contents.len() as u64;
